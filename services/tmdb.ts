@@ -24,21 +24,27 @@ export const fetchMoviesByYear = async (year: number): Promise<Movie[]> => {
   try {
     const pagesToFetch = [1, 2, 3, 4, 5];
     const fetchPage = async (page: number) => {
-      const response = await fetch(
-        `${BASE_URL}/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=primary_release_date.asc&include_adult=false&include_video=false&page=${page}&primary_release_year=${year}&with_companies=${MAJOR_AMERICAN_STUDIO_IDS}`
-      );
-      if (!response.ok) return [];
-      const data: TMDBResponse = await response.json();
-      return data.results || [];
+      try {
+        const response = await fetch(
+          `${BASE_URL}/discover/movie?api_key=${API_KEY}&language=en-US&sort_by=primary_release_date.asc&include_adult=false&include_video=false&page=${page}&primary_release_year=${year}&with_companies=${MAJOR_AMERICAN_STUDIO_IDS}`
+        );
+        if (!response.ok) return [];
+        const data: TMDBResponse = await response.json();
+        return data.results || [];
+      } catch (e) {
+        console.error(`Failed to fetch page ${page}:`, e);
+        return [];
+      }
     };
 
     const results = await Promise.all(pagesToFetch.map(page => fetchPage(page)));
-    const allMovies = results.flat();
+    // Flatten and filter out any potential nulls or undefined values
+    const allMovies = results.flat().filter(m => m && m.id && m.release_date);
 
     const uniqueMovies = Array.from(new Map(allMovies.map(m => [m.id, m])).values());
 
     return uniqueMovies
-      .filter(m => m.release_date && m.poster_path && m.release_date.startsWith(year.toString()))
+      .filter(m => m.poster_path && m.release_date.startsWith(year.toString()))
       .sort((a, b) => new Date(a.release_date).getTime() - new Date(b.release_date).getTime());
   } catch (error) {
     console.error('Error fetching movies:', error);
